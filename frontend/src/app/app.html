@@ -1,0 +1,65 @@
+<main class="shell">
+  <header>
+    <p class="eyebrow">GoEmotions · Linear SVM · TF-IDF</p>
+    <h1>Sentiment Prediction Dashboard</h1>
+    <p class="sub">Classifies a comment as {{ classes.join(' / ') }} using the model trained in the lab notebook.</p>
+  </header>
+
+  @if (deployedStatic) {
+    <aside class="notice">
+      <strong>Static GitHub Pages demo.</strong> This page has no Python backend, so live
+      predictions are disabled. Run Flask and Angular locally to get predictions.
+    </aside>
+  }
+
+  <form (ngSubmit)="submit()" class="card">
+    <label for="text">{{ field.label }}</label>
+    <textarea
+      id="text"
+      name="text"
+      rows="5"
+      [maxlength]="field.maxLength"
+      [placeholder]="field.placeholder ?? ''"
+      [ngModel]="text()"
+      (ngModelChange)="text.set($event)"
+      [required]="field.required"
+    ></textarea>
+    <div class="row">
+      <span class="count">{{ charCount() }} / {{ field.maxLength }}</span>
+      <button type="submit" [disabled]="loading() || deployedStatic">
+        {{ loading() ? 'Predicting…' : 'Run local prediction' }}
+      </button>
+    </div>
+
+    <div class="examples">
+      <span>Try:</span>
+      @for (example of examples; track example) {
+        <button type="button" class="chip" (click)="useExample(example)">{{ example }}</button>
+      }
+    </div>
+  </form>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  @if (result(); as r) {
+    <section class="card result" aria-live="polite">
+      <h2>Prediction</h2>
+      <p class="label" [attr.data-label]="r.prediction">{{ r.prediction }}</p>
+      @if (rankedScores().length) {
+        <h3>Decision scores</h3>
+        <ul class="scores">
+          @for (s of rankedScores(); track s.label) {
+            <li>
+              <span class="name">{{ s.label }}</span>
+              <span class="bar"><span [style.width.%]="barWidth(s.score)" [attr.data-label]="s.label"></span></span>
+              <span class="value">{{ s.score.toFixed(3) }}</span>
+            </li>
+          }
+        </ul>
+      }
+      <p class="disclaimer">{{ r.disclaimer }}</p>
+    </section>
+  }
+</main>
