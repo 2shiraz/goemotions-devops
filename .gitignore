@@ -1,0 +1,29 @@
+# Python and local environments
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+!.env.example
+
+# Angular dependencies and build outputs
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.ipynb_checkpoints/
+
+# Data: GoEmotions is a public dataset, but the full CSV is large (~200k rows)
+# and is downloaded by the notebook, so it is not committed.
+data/*.csv
+!data/sample_inputs.csv
+
+# The model bundle (~2.5 MB, trained on public data) IS committed so CI can
+# run the model-dependent API tests.
+
+# Local logs
+*.log

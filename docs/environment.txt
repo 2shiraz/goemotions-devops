@@ -1,0 +1,9 @@
+# Paste the output of these commands (Stage 2.7) from YOUR Windows PC:
+#   git --version
+#   node --version
+#   npm --version
+#   py -3.12 --version
+#   ng version
+
+Model artifact: saved in Google Colab with scikit-learn 1.6.1 (detected from the pickle).
+Backend pins: see backend/requirements.txt
