@@ -1,0 +1,134 @@
+NOVELTY STATEMENT - GoEmotions Sentiment Prediction App (DevOps Lab)
+=====================================================================
+
+Student : Shiraz Ahmad Khan (232056, BSSE-7-B)
+Project : TF-IDF + Linear SVM on GoEmotions, served by Flask, Angular UI,
+          GitHub Actions CI, GitHub Pages deployment
+
+
+1. BASE PAPERS
+--------------
+
+[P1] Large Language Models on Fine-grained Emotion Detection Dataset with
+     Data Augmentation and Transfer Learning (Wang et al., 2024)
+     Link: https://arxiv.org/pdf/2403.06108
+     Fine-tunes BERT on GoEmotions and improves minority emotions with data
+     augmentation and transfer learning (macro F1 0.46 -> 0.52).
+
+[P2] Multi-Label Emotion Classification Using Deep Learning on the
+     Go-Emotions Dataset
+     Link: https://www.researchgate.net/publication/403600449_Multi-Label_Emotion_Classification_Using_Deep_Learning_on_the_Go-Emotions_Dataset
+     Deep learning model for multi-label emotion detection on GoEmotions,
+     using class balancing and binary (one-vs-rest) training.
+
+[P3] Fine-Grained Emotion Detection on GoEmotions: Experimental Comparison
+     of Classical Machine Learning, BiLSTM, and Transformer Models
+     (Harutyunyan & Kumar, 2026)
+     Link: https://www.alphaxiv.org/pdf/2601.18162
+     Compares Logistic Regression, BiLSTM and BERT on GoEmotions. BERT gets
+     the best macro F1 (0.49); per-class thresholds are left as future work.
+
+[P4] EmotiAug: Enhancing Minority Emotion Classification Through
+     Chain-of-Thought Data Augmentation (Guntumadugu, 2025)
+     Link: https://norma.ncirl.ie/9505/1/nagalakshmiguntumadugu.pdf
+     Uses an LLM (DeepSeek-R1) to generate extra samples for rare emotions
+     (GoEmotions macro F1 0.282 -> 0.323; DAIR-AI 0.910 -> 0.939), but is
+     costly and appears to split by annotation row, not by comment.
+
+
+2. GAPS COMMON TO ALL BASE PAPERS
+---------------------------------
+
+G1. Research-only. None of the papers deploy the model, expose it through
+    an API, test it in CI, version it or monitor it after release.
+G2. Evaluation leakage risk. GoEmotions has 3-5 rater rows per comment.
+    Row-level splits (P4) can leak the same text into the test set.
+G3. Fixed decision thresholds. All use argmax or 0.5. P3 lists per-class
+    threshold calibration as future work.
+G4. Rater disagreement is thrown away. Every paper collapses the raters to
+    a single label; none uses the per-rater rows as a confidence signal.
+G5. Heavy, costly fixes for imbalance. P1 needs BERT + paraphrasers, P4
+    calls a 671B-parameter LLM through a paid API. No paper shows a cheap,
+    reproducible fix for a lightweight model.
+G6. No explanation of individual predictions to the end user.
+
+
+3. PROPOSED NOVELTY FOR THIS PROJECT
+------------------------------------
+
+N1. Leakage-safe, comment-grouped evaluation (addresses G2) - DONE
+    The notebook already splits with GroupShuffleSplit on the comment id
+    (ID overlap = 0) and drops tied cross-group annotations (11,886 rows).
+    This is stated as a contribution and kept as a CI test, so a later
+    change cannot re-introduce leakage.
+
+N2. End-to-end MLOps delivery of an emotion model (addresses G1) - DONE /
+    EXTEND
+    Done: Flask /predict and /health, strict input validation, Angular
+    client, pytest suite, GitHub Actions CI, GitHub Pages deployment.
+    Extend:
+      - A model-quality gate in CI. The pipeline re-scores a frozen,
+        grouped test sample and fails the build if macro F1 drops below
+        the recorded baseline (0.54).
+      - Model version and training metadata returned by /health, plus a
+        model card in the repo.
+      - Lightweight production monitoring. Log the share of
+        out-of-vocabulary tokens and the predicted-class mix per day to
+        flag input drift away from Reddit-style text.
+
+N3. Calibrated scores and per-class thresholds (addresses G3)
+    LinearSVC only returns raw decision scores today. Wrap it in
+    CalibratedClassifierCV so the API returns real probabilities. Then tune
+    one decision threshold per class on a grouped validation split, which
+    is the step P3 left as future work. Target: lift the weakest class,
+    Ambiguous (F1 0.42), without hurting Neutral, the class P3 lost to
+    class weighting.
+
+N4. Rater-agreement aware labels and abstention (addresses G4)
+    Use the rater_id rows to compute, per comment, how many raters agreed
+    on the winning sentiment group. Then either:
+      a) train with agreement as a sample weight (soft labels), or
+      b) have the API return "uncertain / low confidence" when the
+         calibrated top probability is below a tuned cut-off, instead of
+         forcing a label.
+    None of the base papers use rater-level disagreement. It also fits the
+    project's ethics note that many predictions will be wrong.
+
+N5. Cheap, reproducible minority-class augmentation (addresses G5)
+    P1 found that augmenting everything hurts and augmenting only minority
+    classes helps. P4 showed LLM augmentation works but is slow, costly
+    and tied to a hosted API. Proposal: augment ONLY the minority
+    "Ambiguous" group (20,957 of 195,928 rows) with an open-weight model
+    or EDA/back-translation, filter samples with the current classifier
+    plus a keyword check, and cap synthetic data at 1x the original class
+    size. Report macro F1 and Ambiguous F1 before and after on the SAME
+    grouped test set.
+
+N6. Per-prediction explanation in the API and UI (addresses G6)
+    A linear model can show why it chose a class: the top TF-IDF n-grams
+    multiplied by their class weights. Return the top 5 contributing
+    phrases in /predict and highlight them in the Angular form. This costs
+    almost nothing, unlike attention or SHAP on BERT.
+
+
+4. HOW THE NOVELTY WILL BE MEASURED
+-----------------------------------
+
+- Same grouped 80/20 split for every experiment (no leakage).
+- Metrics: accuracy, macro F1, weighted F1, per-class F1 (especially
+  Ambiguous and Neutral), and the expected calibration error for N3.
+- Baseline to beat: Linear SVM, accuracy 0.57, macro F1 0.54, weighted
+  F1 0.58.
+- For N4: accuracy on the predictions the model does NOT abstain on, and
+  the abstention rate.
+- For N2: CI fails on a deliberately degraded model, and passes on the
+  current model.
+
+
+5. ONE-LINE SUMMARY
+-------------------
+
+The base papers improve accuracy offline with ever larger models. This
+project adds what they leave out: a leakage-safe, deployed, tested and
+monitored emotion classifier that returns calibrated, explainable
+predictions and says "not sure" when the raters themselves disagreed.
